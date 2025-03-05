@@ -41,7 +41,6 @@
   color-scheme: light dark;
   color: var(--foreground);
   background-color: var(--background);
-  background-image: url('./assets/bg-white.png'); /* Light mode background */
   background-size: cover;
   background-repeat: no-repeat;
   background-attachment: fixed;
@@ -62,11 +61,13 @@
   --font-size-7xl: 4.5rem;
   --font-size-8xl: 6rem;
   --font-size-9xl: 8rem;
+  --light-background: url('./assets/bg-white.png'); /* Light mode background */
+  --dark-background: url('./assets/bg.png'); /* Dark mode background */
 }
 
 @layer base {
   :root {
-    /* --background: 0 0% 100%; */
+    --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
     --card-foreground: 240 10% 3.9%;
@@ -117,7 +118,7 @@
   }
 
   .dark {
-    /* --background: 240 10% 3.9%; */
+    --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
     --card: 240 10% 3.9%;
     --card-foreground: 0 0% 98%;
@@ -202,13 +203,13 @@
 }
 
 body {
-  background-image: url('./assets/bg-white.png');
+  background-image: var(--light-background);
+  transition: background-image 0.5s ease;
 }
 
-.dark body {
-  background-image: url('./assets/bg.png');
+body.dark {
+  background-image: var(--dark-background);
 }
-
 
 /* Style */
 
