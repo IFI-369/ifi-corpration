@@ -2,21 +2,44 @@ import { axiosInstance } from "../api/apiConfig";
 import useAuth from "./useAuth";
 
 export default function useRefreshToken() {
-  const { isLoggedIn, setAccessToken, setCSRFToken } = useAuth();
+  const { setAccessToken, setRefreshToken, setCSRFToken, setIsLoggedIn } =
+    useAuth();
 
   const refresh = async () => {
-    if (!isLoggedIn) {
-      return;
+    const refreshToken = localStorage.getItem("refresh_token");
+    if (!refreshToken) {
+      console.error("No refresh token available");
+      setIsLoggedIn(false);
+      return null;
     }
 
-    const response = await axiosInstance.post("auth/refresh-token");
-    setAccessToken(response.data.access);
-    setCSRFToken(response.headers["x-csrftoken"]);
+    try {
+      const response = await axiosInstance.post(
+        "auth/refresh-token",
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${refreshToken}`,
+          },
+        },
+      );
 
-    return {
-      accessToken: response.data.access,
-      csrfToken: response.headers["x-csrftoken"],
-    };
+      const newAccessToken = response.data.access;
+      const newCSRFToken = response.headers["x-csrftoken"];
+
+      setAccessToken(newAccessToken);
+      setCSRFToken(newCSRFToken);
+
+      if (response.data.refresh) {
+        setRefreshToken(response.data.refresh);
+      }
+
+      return { accessToken: newAccessToken, csrfToken: newCSRFToken };
+    } catch (error) {
+      console.error("Error refreshing token:", error.message);
+      setIsLoggedIn(false); // Log the user out if refresh fails
+      return null;
+    }
   };
 
   return refresh;

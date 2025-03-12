@@ -1,6 +1,42 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable no-case-declarations */
+import { useEffect, useState } from "react";
 
+let YOUTUBE_API_KEY = "";
+let GEMINI_API_KEY = "";
+let isInitialized = false;
+
+export const initializeApiKeys = async () => {
+  if (isInitialized) return;
+
+  try {
+    const token = localStorage.getItem("access_token");
+
+    const response = await fetch(
+      `${import.meta.env.VITE_BACKEND_URL}/auth/api-keys/`,
+      {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch API keys");
+    }
+
+    const { youtube, gemini, instagram, twitter } = await response.json();
+    YOUTUBE_API_KEY = youtube;
+    GEMINI_API_KEY = gemini;
+    updateInstagramApiKey(instagram);
+    updateTwitterApiKey(twitter);
+    isInitialized = true;
+  } catch (error) {
+    console.error("Error fetching API keys:", error);
+    throw error;
+  }
+};
 
 export const updateYoutubeApiKey = (newKey: string) => {
   YOUTUBE_API_KEY = newKey;
@@ -12,27 +48,24 @@ export const updateGeminiApiKey = (newKey: string) => {
   localStorage.setItem("GEMINI_API_KEY", newKey);
 };
 
+export const getInstagramApiKey = (): string => {
+  return localStorage.getItem("INSTAGRAM_API_KEY") || "";
+};
+
 export const updateInstagramApiKey = (newKey: string) => {
-  INSTAGRAM_API_KEY = newKey;
   localStorage.setItem("INSTAGRAM_API_KEY", newKey);
 };
 
+export const getTwitterApiKey = (): string => {
+  return localStorage.getItem("TWITTER_API_KEY") || "";
+};
+
 export const updateTwitterApiKey = (newKey: string) => {
-  TWITTER_API_KEY = newKey;
   localStorage.setItem("TWITTER_API_KEY", newKey);
 };
 
 export const getYoutubeApiKey = () => YOUTUBE_API_KEY;
 export const getGeminiApiKey = () => GEMINI_API_KEY;
-export const getInstagramApiKey = () => INSTAGRAM_API_KEY;
-export const getTwitterApiKey = () => TWITTER_API_KEY;
-
-type Filters = {
-  sortBy?: string;
-  uploadDate?: string;
-  platforms?: string[];
-  type?: string;
-};
 
 export interface VideoItem {
   kind: string;
@@ -106,6 +139,8 @@ const parseISODuration = (duration: string): number => {
 };
 
 export const getVideoSummary = async (videoUrl: string): Promise<string> => {
+  await initializeApiKeys();
+
   try {
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
@@ -141,19 +176,16 @@ export const youtubeSearch = async (
   maxResults = 10,
   filters: Filters = {},
 ): Promise<VideoItem[]> => {
+  await initializeApiKeys();
+
   try {
     const params = new URLSearchParams({
       part: "snippet",
       maxResults: maxResults.toString(),
       q: query,
       key: YOUTUBE_API_KEY,
+      type: filters.type === "کانال" ? "channel" : "video",
     });
-
-    if (filters.type === "کانال") {
-      params.set("type", "channel");
-    } else {
-      params.set("type", "video");
-    }
 
     if (filters.sortBy) {
       switch (filters.sortBy) {
@@ -182,6 +214,7 @@ export const youtubeSearch = async (
       `https://www.googleapis.com/youtube/v3/search?${params}`,
     );
     const searchData = await searchRes.json();
+
     if (!searchData.items?.length) return [];
 
     const itemIds = searchData.items

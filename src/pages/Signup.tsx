@@ -9,33 +9,33 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage
+  FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { motion, AnimatePresence } from "framer-motion";
 import Bounce from "@/components/effectlib/Bounce";
 import { User, Lock, Key } from "lucide-react";
-
+import Cookies from "js-cookie";
 
 const step1Schema = z.object({
   first_name: z.string().min(1, "نام اول ضروری است"),
   last_name: z.string().min(1, "نام خانوادگی ضروری است"),
-  email: z.string().email("آدرس ایمیل معتبر نیست")
+  email: z.string().email("آدرس ایمیل معتبر نیست"),
 });
 
 const step2Schema = z
   .object({
     password: z.string().min(8, "رمز عبور باید حداقل 8 کاراکتر باشد"),
-    confirm_password: z.string()
+    confirm_password: z.string(),
   })
   .refine((data) => data.password === data.confirm_password, {
     message: "رمزهای عبور مطابقت ندارند",
-    path: ["confirm_password"]
+    path: ["confirm_password"],
   });
 
 const step3Schema = z.object({
-  otp: z.string().length(6, "کد تایید باید 6 کاراکتر باشد")
+  otp: z.string().length(6, "کد تایید باید 6 کاراکتر باشد"),
 });
 
 export default function SignUp() {
@@ -48,48 +48,81 @@ export default function SignUp() {
     email: "",
     password: "",
     confirm_password: "",
-    otp: ""
+    otp: "",
   });
 
   const form = useForm({
     resolver: zodResolver(
-      step === 1 ? step1Schema : step === 2 ? step2Schema : step3Schema
+      step === 1 ? step1Schema : step === 2 ? step2Schema : step3Schema,
     ),
-    defaultValues: formData
+    defaultValues: formData,
   });
 
   const onSubmit = async (data: any) => {
     setLoading(true);
     setError(null);
+
     try {
+      // Merge the current step's data with the existing form data
       const mergedData = { ...formData, ...data };
       setFormData(mergedData);
-      const response = await fetch("http://localhost:8000/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...mergedData, step })
-      });
 
-      const contentType = response.headers.get("content-type");
-      let responseData;
-      if (contentType?.includes("application/json")) {
-        responseData = await response.json();
-      } else {
-        const text = await response.text();
-        throw new Error(`خطای سرور: ${text}`);
+      // Prepare the payload based on the step
+      let payload: any;
+      if (step === 1) {
+        payload = {
+          step: 1,
+          email: mergedData.email,
+          first_name: mergedData.first_name,
+          last_name: mergedData.last_name,
+        };
+      } else if (step === 2) {
+        payload = {
+          step: 2,
+          email: mergedData.email,
+          password: mergedData.password,
+          confirm_password: mergedData.confirm_password,
+        };
+      } else if (step === 3) {
+        payload = {
+          step: 3,
+          email: mergedData.email,
+          otp: mergedData.otp,
+        };
       }
 
-      if (!response.ok)
-        throw new Error(responseData.detail || "ثبت نام ناموفق بود");
+      console.log("Sending payload:", payload); // Log the payload
+
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL}/auth/register`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": Cookies.get("csrftoken"),
+          },
+          credentials: "include",
+          body: JSON.stringify(payload),
+        },
+      );
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          responseData.detail || responseData.error || "خطا در ثبت نام ⚠️",
+        );
+      }
 
       if (step === 3) {
-        alert("ثبت نام با موفقیت انجام شد!");
+        alert("ثبت نام با موفقیت انجام شد! 🎉");
         window.location.href = "/";
       } else {
         setStep(step + 1);
       }
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "خطای سرور رخ داده است ⚠️");
+      console.error("Signup error:", err.response || err.message); // Log the error
     } finally {
       setLoading(false);
     }
@@ -296,8 +329,8 @@ export default function SignUp() {
               {loading
                 ? "در حال ارسال..."
                 : step === 3
-                ? "اتمام ثبت نام"
-                : "بعدی"}
+                  ? "اتمام ثبت نام"
+                  : "بعدی"}
             </Button>
             <Button
               type="button"

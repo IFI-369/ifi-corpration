@@ -1,219 +1,178 @@
-"use client";
-
-import { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger
-} from "@/components/ui/accordion";
-import {
-  updateYoutubeApiKey,
-  updateGeminiApiKey,
-  updateInstagramApiKey,
-  updateTwitterApiKey,
-  getYoutubeApiKey,
-  getGeminiApiKey,
-  getInstagramApiKey,
-  getTwitterApiKey
-} from "@/lib/youtube-api";
-import Bounce from "@/components/effectlib/Bounce";
+import useAuth from "@/hooks/useAuth";
+import useLogout from "@/hooks/useLogout";
+import useUser from "@/hooks/useUser";
 
-export default function Admin() {
-  const [apiKeys, setApiKeys] = useState({
-    youtube: getYoutubeApiKey(),
-    gemini: getGeminiApiKey(),
-    instagram: getInstagramApiKey(),
-    twitter: getTwitterApiKey()
+const User: React.FC = () => {
+  const { user, loading: userLoading } = useAuth();
+  const navigate = useNavigate();
+  const logout = useLogout();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const { getUser, loading: userFetchLoading, error: userError } = useUser();
+  const [apiKeys, setApiKeys] = useState<{ [key: string]: string }>({
+    youtube: "",
+    gemini: "",
+    instagram: "",
+    twitter: "",
   });
 
-  const handleInputChange = (key: string, value: string) => {
-    setApiKeys((prev) => ({ ...prev, [key]: value }));
+  useEffect(() => {
+    console.log("User object:", user);
+    console.log("is_staff value:", user?.is_staff);
+    console.log("userLoading value:", userLoading); // Debugging: Check userLoading
+    if (!userLoading && user && !user.is_staff) {
+      console.log("User is not a staff member. Redirecting...");
+      navigate("/");
+    }
+  }, [user, userLoading, navigate]);
+
+  useEffect(() => {
+    const fetchApiKeys = async () => {
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_BACKEND_URL}/auth/api-keys/`,
+        );
+        if (!response.ok) {
+          throw new Error("Failed to fetch API keys");
+        }
+        const data = await response.json();
+        setApiKeys(data); // Set the fetched API keys as the default values
+      } catch (err) {
+        setError("Failed to fetch API keys. Please try again.");
+        console.error(err);
+      }
+    };
+
+    fetchApiKeys();
+  }, []); // Fetch API keys only once
+
+  const onLogout = async () => {
+    setLoading(true);
+    try {
+      await logout();
+      navigate("/login");
+    } catch (err) {
+      setError("Logout failed. Please try again.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleApplyKey = (type: string) => {
-    switch (type) {
-      case "youtube":
-        updateYoutubeApiKey(apiKeys.youtube);
-        break;
-      case "gemini":
-        updateGeminiApiKey(apiKeys.gemini);
-        break;
-      case "instagram":
-        updateInstagramApiKey(apiKeys.instagram);
-        break;
-      case "twitter":
-        updateTwitterApiKey(apiKeys.twitter);
-        break;
-      default:
-        break;
-    }
-    alert(`${type.toUpperCase()} API Key Updated!`);
+  const handleApiKeyChange = (key: string, value: string) => {
+    setApiKeys((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
   };
+
+  const onSave = async (event: React.FormEvent) => {
+    event.preventDefault(); // Prevent the form from refreshing the page
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL}/auth/api-keys/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(apiKeys),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update API keys");
+      }
+
+      setSuccess("API keys updated successfully!");
+    } catch (err) {
+      setError("Failed to update API keys. Please try again.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (userLoading || userFetchLoading) {
+    return <p>Loading user data...</p>;
+  }
+
+  if (userError) {
+    return <p className="text-red-500">{userError}</p>;
+  }
 
   return (
-    <div className="lg:container lg:mx-auto flex flex-col justify-center text-center mx-5 mt-10">
-      <Bounce className="Row-1" delay={0.2} duration={0.6} bounceHeight={30}>
-        <h1 className="text-xl mb-5">API Recovery Entry</h1>
-      </Bounce>
-      <Bounce className="Row-1" delay={0.4} duration={0.6} bounceHeight={30}>
-        <Accordion type="single" collapsible>
-          <AccordionItem value="item-1">
-            <AccordionTrigger>Recovery Set 1</AccordionTrigger>
-            <AccordionContent className="space-y-2 m-2">
-              {/* YouTube API Input */}
-              <div className="flex gap-2 *:not-first:mt-2 flex-row justify-center items-center">
-                <Input
-                  className="flex-1 w-[250px]"
-                  placeholder="Youtube API Entry"
-                  value={apiKeys.youtube}
-                  onChange={(e) => handleInputChange("youtube", e.target.value)}
-                />
-                <Button
-                  className="h-[36px]"
-                  variant="outline"
-                  onClick={() => handleApplyKey("youtube")}
-                >
-                  Apply
-                </Button>
-              </div>
+    <div className="container mx-auto p-4">
+      <h1 className="text-3xl font-bold mb-4">اطلاعات کاربری 👤</h1>
 
-              {/* Gemini API Input */}
-              <div className="flex gap-2 *:not-first:mt-2 flex-row justify-center items-center">
-                <Input
-                  className="flex-1 w-[250px]"
-                  placeholder="Gemini API Entry"
-                  value={apiKeys.gemini}
-                  onChange={(e) => handleInputChange("gemini", e.target.value)}
-                />
-                <Button
-                  className="h-[36px]"
-                  variant="outline"
-                  onClick={() => handleApplyKey("gemini")}
-                >
-                  Apply
-                </Button>
-              </div>
+      {error && <div className="text-red-500 mb-4">{error}</div>}
+      {success && <div className="text-green-500 mb-4">{success}</div>}
 
-              {/* Instagram API Input */}
-              <div className="flex gap-2 *:not-first:mt-2 flex-row justify-center items-center">
-                <Input
-                  className="flex-1 w-[250px]"
-                  placeholder="Instagram API Entry"
-                  value={apiKeys.instagram}
-                  onChange={(e) =>
-                    handleInputChange("instagram", e.target.value)
-                  }
-                />
-                <Button
-                  className="h-[36px]"
-                  variant="outline"
-                  onClick={() => handleApplyKey("instagram")}
-                >
-                  Apply
-                </Button>
-              </div>
+      {user ? (
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+          <h2 className="text-2xl font-bold mb-4">
+            سلام، {user.first_name} {user.last_name}! 👋
+          </h2>
+          <p className="text-gray-700 dark:text-gray-300">
+            <strong>ایمیل:</strong> {user.email}
+          </p>
+          <p className="text-gray-700 dark:text-gray-300">
+            <strong>تاریخ ایجاد حساب:</strong>{" "}
+            {new Date(user.created_at).toLocaleDateString("fa-IR")}
+          </p>
+          <p className="text-gray-700 dark:text-gray-300">
+            <strong>آیا ادمین است؟:</strong>{" "}
+            {user.is_superuser ? "بله ✅" : "خیر ❌"}
+          </p>
+          <p className="text-gray-700 dark:text-gray-300">
+            <strong>آیا کارمند است؟:</strong>{" "}
+            {user.is_staff ? "بله ✅" : "خیر ❌"}
+          </p>
 
-              {/* Twitter API Input */}
-              <div className="flex gap-2 *:not-first:mt-2 flex-row justify-center items-center">
-                <Input
-                  className="flex-1 w-[250px]"
-                  placeholder="Twitter API Entry"
-                  value={apiKeys.twitter}
-                  onChange={(e) => handleInputChange("twitter", e.target.value)}
-                />
-                <Button
-                  className="h-[36px]"
-                  variant="outline"
-                  onClick={() => handleApplyKey("twitter")}
-                >
-                  Apply
-                </Button>
+          <form onSubmit={onSave}>
+            <div className="mt-4">
+              <h3 className="text-xl font-bold mb-2">API Keys</h3>
+              <div className="space-y-4">
+                {Object.entries(apiKeys).map(([key, value]) => (
+                  <div key={key}>
+                    <label className="block text-gray-700 dark:text-gray-300">
+                      {key.charAt(0).toUpperCase() + key.slice(1)} API Key:
+                    </label>
+                    <input
+                      type="text"
+                      value={value}
+                      onChange={(e) => handleApiKeyChange(key, e.target.value)}
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                ))}
               </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      </Bounce>
-      <Bounce className="Row-1" delay={0.6} duration={0.6} bounceHeight={30}>
-        <Accordion type="single" collapsible>
-          <AccordionItem value="item-1">
-            <AccordionTrigger>Recovery Set 2</AccordionTrigger>
-            <AccordionContent className="space-y-2 m-2">
-              {/* YouTube API Input */}
-              <div className="flex gap-2 *:not-first:mt-2 flex-row justify-center items-center">
-                <Input
-                  className="flex-1 w-[250px]"
-                  placeholder="Youtube API Entry"
-                  value={apiKeys.youtube}
-                  onChange={(e) => handleInputChange("youtube", e.target.value)}
-                />
-                <Button
-                  className="h-[36px]"
-                  variant="outline"
-                  onClick={() => handleApplyKey("youtube")}
-                >
-                  Apply
-                </Button>
-              </div>
+            </div>
 
-              {/* Gemini API Input */}
-              <div className="flex gap-2 *:not-first:mt-2 flex-row justify-center items-center">
-                <Input
-                  className="flex-1 w-[250px]"
-                  placeholder="Gemini API Entry"
-                  value={apiKeys.gemini}
-                  onChange={(e) => handleInputChange("gemini", e.target.value)}
-                />
-                <Button
-                  className="h-[36px]"
-                  variant="outline"
-                  onClick={() => handleApplyKey("gemini")}
-                >
-                  Apply
-                </Button>
-              </div>
+            <Button type="submit" className="mt-4" disabled={loading}>
+              {loading ? "در حال ذخیره..." : "ذخیره تغییرات 💾"}
+            </Button>
+          </form>
+        </div>
+      ) : (
+        <p className="text-gray-700 dark:text-gray-300">
+          در حال بارگذاری اطلاعات کاربری...
+        </p>
+      )}
 
-              {/* Instagram API Input */}
-              <div className="flex gap-2 *:not-first:mt-2 flex-row justify-center items-center">
-                <Input
-                  className="flex-1 w-[250px]"
-                  placeholder="Instagram API Entry"
-                  value={apiKeys.instagram}
-                  onChange={(e) =>
-                    handleInputChange("instagram", e.target.value)
-                  }
-                />
-                <Button
-                  className="h-[36px]"
-                  variant="outline"
-                  onClick={() => handleApplyKey("instagram")}
-                >
-                  Apply
-                </Button>
-              </div>
-
-              {/* Twitter API Input */}
-              <div className="flex gap-2 *:not-first:mt-2 flex-row justify-center items-center">
-                <Input
-                  className="flex-1 w-[250px]"
-                  placeholder="Twitter API Entry"
-                  value={apiKeys.twitter}
-                  onChange={(e) => handleInputChange("twitter", e.target.value)}
-                />
-                <Button
-                  className="h-[36px]"
-                  variant="outline"
-                  onClick={() => handleApplyKey("twitter")}
-                >
-                  Apply
-                </Button>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      </Bounce>
+      <Button className="mt-4" onClick={onLogout} disabled={loading}>
+        {loading ? "در حال خروج..." : "خروج از حساب 🚪"}
+      </Button>
     </div>
   );
-}
+};
+
+export default User;

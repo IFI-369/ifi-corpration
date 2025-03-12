@@ -2,13 +2,19 @@ import useAuth from "./useAuth";
 import { axiosPrivateInstance } from "../api/apiConfig";
 
 export default function useLogout() {
-  const { setUser, setAccessToken, setCSRFToken, setIsLoggedIn } = useAuth();
+  const {
+    setUser,
+    setAccessToken,
+    setRefreshToken,
+    setCSRFToken,
+    setIsLoggedIn,
+  } = useAuth();
 
   const logout = async () => {
     try {
-      const response = await axiosPrivateInstance.post("auth/logout");
-
+      await axiosPrivateInstance.post("auth/logout");
       setAccessToken(null);
+      setRefreshToken(null);
       setCSRFToken(null);
       setUser({});
       setIsLoggedIn(false);
@@ -19,3 +25,4 @@ export default function useLogout() {
 
   return logout;
 }
+

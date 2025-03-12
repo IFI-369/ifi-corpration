@@ -4,7 +4,7 @@ import useAuth from "./useAuth";
 import useRefreshToken from "./useRefreshToken";
 
 export default function useAxiosPrivate() {
-  const { accessToken, setAccessToken, csrftoken, user } = useAuth();
+  const { accessToken, setAccessToken, csrftoken, setIsLoggedIn } = useAuth();
   const refresh = useRefreshToken();
 
   useEffect(() => {
@@ -29,11 +29,20 @@ export default function useAxiosPrivate() {
           !prevRequest?.sent
         ) {
           prevRequest.sent = true;
+          const refreshResponse = await refresh();
+
+          if (!refreshResponse) {
+            setIsLoggedIn(false); // Log the user out if refresh fails
+            return Promise.reject(error);
+          }
+
           const { csrfToken: newCSRFToken, accessToken: newAccessToken } =
-            await refresh();
+            refreshResponse;
+
           setAccessToken(newAccessToken);
           prevRequest.headers["Authorization"] = `Bearer ${newAccessToken}`;
           prevRequest.headers["X-CSRFToken"] = newCSRFToken;
+
           return axiosPrivateInstance(prevRequest);
         }
         return Promise.reject(error);
@@ -44,7 +53,7 @@ export default function useAxiosPrivate() {
       axiosPrivateInstance.interceptors.request.eject(requestIntercept);
       axiosPrivateInstance.interceptors.response.eject(responseIntercept);
     };
-  }, [accessToken, user]);
+  }, [accessToken]);
 
   return axiosPrivateInstance;
 }
